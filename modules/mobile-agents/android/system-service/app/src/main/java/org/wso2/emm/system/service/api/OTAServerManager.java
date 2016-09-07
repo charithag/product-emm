@@ -234,44 +234,6 @@ public class OTAServerManager {
         }
     }
 
-    private class Timeout extends TimerTask {
-        private AsyncTask asyncTask;
-
-        public Timeout(AsyncTask task) {
-            asyncTask = task;
-        }
-
-        @Override
-        public void run() {
-            String message;
-
-            isProgressUpdateTerminated = true;
-            asyncTask.cancel(true);
-
-            Log.w(TAG,"Timed out while downloading.");
-
-            File targetFile = new File(FileUtils.getUpgradePackageFilePath());
-            if (targetFile.exists()) {
-                targetFile.delete();
-                Log.w(TAG,"Partially downloaded update has been deleted.");
-            }
-
-            if (checkNetworkOnline()) {
-                message = "Connection failure (Socket timeout) when downloading the update package.";
-                Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.CONNECTION_FAILED);
-                CommonUtils.sendBroadcast(context, Constants.Operation.UPGRADE_FIRMWARE, Constants.Code.FAILURE,
-                        Constants.Status.CONNECTION_FAILED, message);
-            } else {
-                message = "Disconnected from WiFi when downloading the update package.";
-                Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.WIFI_OFF);
-                CommonUtils.sendBroadcast(context, Constants.Operation.UPGRADE_FIRMWARE, Constants.Code.FAILURE,
-                        Constants.Status.WIFI_OFF, message);
-            }
-            Log.e(TAG, message);
-            CommonUtils.callAgentApp(context, Constants.Operation.FAILED_FIRMWARE_UPGRADE_NOTIFICATION, 0, message);
-        }
-    }
-
     private class DownloadProgressUpdateExecutor implements Executor {
         public void execute(@NonNull Runnable r) {
             new Thread(r).start();
@@ -353,9 +315,6 @@ public class OTAServerManager {
                     while ((count = input.read(data)) >= 0) {
                         downloadedLength += count;
                         output.write(data, DEFAULT_OFFSET, (int) count);
-                        timeoutTimer.cancel();
-                        timeoutTimer = new Timer();
-                        timeoutTimer.schedule(new Timeout(this), Constants.FIRMWARE_UPGRADE_READ_TIMEOUT);
                     }
                     publishDownloadProgress(lengthOfFile, downloadedLength);
                     isProgressUpdateTerminated = true;
@@ -370,13 +329,28 @@ public class OTAServerManager {
                                                                             DEFAULT_STATE_ERROR_CODE, null, DEFAULT_STATE_INFO_CODE);
                     }
                 } catch (SocketTimeoutException e) {
-                    String message = "Connection failure (Socket timeout) when downloading update package.";
-                    Log.e(TAG, message + e);
-                    CommonUtils.sendBroadcast(context, Constants.Operation.UPGRADE_FIRMWARE, Constants.Code.FAILURE,
-                            Constants.Status.CONNECTION_FAILED, message);
-                    CommonUtils.callAgentApp(context, Constants.Operation.FAILED_FIRMWARE_UPGRADE_NOTIFICATION, 0, null);
-                    Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status),
-                            Constants.Status.CONNECTION_FAILED);
+                    String message;
+                    isProgressUpdateTerminated = true;
+                    asyncTask.cancel(true);
+
+                    if (targetFile.exists()) {
+                        targetFile.delete();
+                        Log.w(TAG, "Partially downloaded update has been deleted.");
+                    }
+
+                    if (checkNetworkOnline()) {
+                        message = "Connection failure (Socket timeout) when downloading the update package.";
+                        Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.CONNECTION_FAILED);
+                        CommonUtils.sendBroadcast(context, Constants.Operation.UPGRADE_FIRMWARE, Constants.Code.FAILURE,
+                                Constants.Status.CONNECTION_FAILED, message);
+                    } else {
+                        message = "Disconnected from WiFi when downloading the update package.";
+                        Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.WIFI_OFF);
+                        CommonUtils.sendBroadcast(context, Constants.Operation.UPGRADE_FIRMWARE, Constants.Code.FAILURE,
+                                Constants.Status.WIFI_OFF, message);
+                    }
+                    Log.e(TAG, message);
+                    CommonUtils.callAgentApp(context, Constants.Operation.FAILED_FIRMWARE_UPGRADE_NOTIFICATION, 0, message);
                 } catch (IOException e) {
                     String message = "Unable to find firmware upgrade package " + serverConfig.getPackageURL().toString();
                     Log.e(TAG, message + e);
@@ -597,12 +571,8 @@ public class OTAServerManager {
                     while ((bytesRead = reader.read(buffer)) > 0) {
                         // Write current segment into byte output stream
                         writer.write(buffer, 0, bytesRead);
-                        Log.d(TAG, "wrote " + bytesRead + " into byte output stream");
                         totalBufRead += bytesRead;
                         buffer = new byte[bufSize];
-                        timer.cancel();
-                        timer = new Timer();
-                        timer.schedule(new Timeout(this), Constants.FIRMWARE_UPGRADE_READ_TIMEOUT);
                     }
 
                     Log.d(TAG, "Download finished: " + (Integer.toString(totalBufRead)) + " bytes downloaded");
@@ -610,10 +580,23 @@ public class OTAServerManager {
                     parser = new BuildPropParser(writer, context);
                     timer.cancel();
                 } catch (SocketTimeoutException e) {
-                    String message = "Connection failure (Socket timeout) when retrieving update package size.";
-                    Log.e(TAG, message + e);
-                    CommonUtils.sendBroadcast(context, operation, Constants.Code.FAILURE, Constants.Status.CONNECTION_FAILED, message);
-                    CommonUtils.callAgentApp(context, Constants.Operation.FAILED_FIRMWARE_UPGRADE_NOTIFICATION, 0, null);
+                    String message;
+                    isProgressUpdateTerminated = true;
+                    asyncTask.cancel(true);
+
+                    if (checkNetworkOnline()) {
+                        message = "Connection failure (Socket timeout) when downloading the Property list (build.prop).";
+                        Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.CONNECTION_FAILED);
+                        CommonUtils.sendBroadcast(context, operation, Constants.Code.FAILURE,
+                                Constants.Status.CONNECTION_FAILED, message);
+                    } else {
+                        message = "Disconnected from WiFi when downloading the Property list (build.prop).";
+                        Preference.putString(context, context.getResources().getString(R.string.upgrade_download_status), Constants.Status.WIFI_OFF);
+                        CommonUtils.sendBroadcast(context, operation, Constants.Code.FAILURE,
+                                Constants.Status.WIFI_OFF, message);
+                    }
+                    Log.e(TAG, message);
+                    CommonUtils.callAgentApp(context, Constants.Operation.FAILED_FIRMWARE_UPGRADE_NOTIFICATION, 0, message);
                 } catch (IOException e) {
                     String message = "Property list (build.prop) not found in the server.";
                     Log.e(TAG, message + e);
