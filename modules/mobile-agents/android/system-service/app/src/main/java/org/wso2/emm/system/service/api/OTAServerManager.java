@@ -92,6 +92,7 @@ public class OTAServerManager {
     private int corePoolSize = 60;
     private int maximumPoolSize = 80;
     private int keepAliveTime = 10;
+    private int downloadAttempt;
 
     //Use our own thread pool executor for async task to schedule new tasks upon download failures.
     private BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>(maximumPoolSize);
@@ -277,7 +278,12 @@ public class OTAServerManager {
         }
     }
 
-    public void startDownloadUpgradePackage(final OTAServerManager serverManager) {
+    public void startDownloadUpgradePackage(OTAServerManager serverManager) {
+        downloadAttempt = 0;
+        _startDownloadUpgradePackage(serverManager);
+    }
+
+    private void _startDownloadUpgradePackage(final OTAServerManager serverManager) {
         if (asyncTask != null){
             asyncTask.cancel(true);
         }
@@ -434,9 +440,17 @@ public class OTAServerManager {
             wakeLock.release();
         }
 
-        if(doRetry){
-            Log.d(TAG, "Retry downloading package after error");
-            startDownloadUpgradePackage(this);
+        boolean isAutomaticRetry = (Preference.hasPreferenceKey(context, context.getResources()
+                .getString(R.string.firmware_upgrade_automatic_retry)) && Preference.getBoolean(context, context.getResources()
+                .getString(R.string.firmware_upgrade_automatic_retry))) || !Preference.hasPreferenceKey(context, context.getResources()
+                .getString(R.string.firmware_upgrade_automatic_retry));
+
+        // OTA update will restart by the agent automatically if auto retry is enabled.
+        // So in here we are retrying to download again only when automatic retry is disabled.
+        if (!isAutomaticRetry && doRetry && Constants.FIRMWARE_UPGRADE_RETRY_COUNT > downloadAttempt) {
+            downloadAttempt++;
+            Log.d(TAG, "Retrying to download OTA package after verification failure.");
+            _startDownloadUpgradePackage(this);
         }
     }
 
