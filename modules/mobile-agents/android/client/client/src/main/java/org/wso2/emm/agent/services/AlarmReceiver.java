@@ -21,6 +21,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import org.wso2.emm.agent.AndroidAgentException;
 import org.wso2.emm.agent.R;
+import org.wso2.emm.agent.utils.AppOperationUtils;
 import org.wso2.emm.agent.utils.CommonUtils;
 import org.wso2.emm.agent.utils.Constants;
 import org.wso2.emm.agent.utils.Preference;
@@ -54,23 +55,24 @@ public class AlarmReceiver extends BroadcastReceiver {
 				Toast.makeText(context, "App install request initiated by admin.",
 						Toast.LENGTH_SHORT).show();
 				//Prepare for install
-				String packageUri;
+				String packageUri = intent.getStringExtra(context.getResources().getString(R.string.app_uri));
+				String appUrl = intent.getStringExtra(context.getResources().getString(R.string.app_url));
 				if (intent.hasExtra(context.getResources().getString(R.string.app_uri))) {
-					Preference.putString(context, context.getResources().getString(
-							R.string.app_install_status), context.getResources().getString(
-							R.string.app_status_value_installed));
-					packageUri = intent.getStringExtra(context.getResources().getString(R.string.app_uri));
-					Intent installIntent = new Intent(Intent.ACTION_VIEW);
-					installIntent.setDataAndType(Uri.parse(packageUri), context.getResources().getString(R.string.application_mgr_mime));
-					installIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					context.startActivity(installIntent);
-				} else {
+                    if (Constants.SYSTEM_APP_ENABLED) {
+                        CommonUtils.callSystemApp(context, Constants.Operation.SILENT_INSTALL_APPLICATION,
+                                appUrl, packageUri);
+                    } else {
+                        AppOperationUtils.updateApplicationStatus(context, appUrl, null,
+                                context.getResources().getString(R.string.app_status_value_installed), null);
+                        Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                        installIntent.setDataAndType(Uri.parse(packageUri), context.getResources().getString(R.string.application_mgr_mime));
+                        installIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(installIntent);
+                    }
+                } else {
 					String error = "Scheduled install failed due to incorrect package URI";
-					Preference.putString(context, context.getResources().getString(
-							R.string.app_install_status), context.getResources().getString(
-							R.string.app_status_value_install_failed));
-					Preference.putString(context, context.getResources().getString(
-							R.string.app_install_failed_message), error);
+					AppOperationUtils.updateApplicationStatus(context, appUrl, null, context.getResources().getString(
+							R.string.app_status_value_install_failed), error);
 					Log.e(TAG, error);
 
 				}
@@ -83,10 +85,15 @@ public class AlarmReceiver extends BroadcastReceiver {
 				String packageName;
 				if (intent.hasExtra(context.getResources().getString(R.string.app_uri))) {
 					packageName = intent.getStringExtra(context.getResources().getString(R.string.app_uri));
-					Uri packageURI = Uri.parse(packageName);
-					Intent uninstallIntent = new Intent(Intent.ACTION_DELETE, packageURI);
-					uninstallIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					context.startActivity(uninstallIntent);
+                    if (Constants.SYSTEM_APP_ENABLED) {
+                        CommonUtils.callSystemApp(context, Constants.Operation.SILENT_UNINSTALL_APPLICATION,
+                                null, packageName);
+                    } else {
+                        Uri packageURI = Uri.parse(packageName);
+                        Intent uninstallIntent = new Intent(Intent.ACTION_DELETE, packageURI);
+                        uninstallIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(uninstallIntent);
+                    }
 				} else {
 					Toast.makeText(context, "App uninstallation failed.",
 							Toast.LENGTH_SHORT).show();

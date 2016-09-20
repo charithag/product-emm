@@ -21,11 +21,21 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.wso2.emm.agent.R;
+import org.wso2.emm.agent.beans.AppOperation;
+import org.wso2.emm.agent.utils.AppOperationUtils;
 import org.wso2.emm.agent.utils.Constants;
 import org.wso2.emm.agent.utils.Preference;
+
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This BroadcastReceiver is registered to receive the notifications from system service app when it's available.
@@ -51,14 +61,16 @@ public class SystemServiceResponseReceiver extends BroadcastReceiver {
                     break;
                 case Constants.Operation.SILENT_INSTALL_APPLICATION:
                     result = new JSONObject(intent.getStringExtra("payload"));
-                    if (Constants.Code.SUCCESS.equals(code) && result.has("appInstallStatus")) {
-                        Preference.putString(context, context.getResources().getString(R.string.app_install_status),
-                                             result.getString("appInstallStatus"));
+                    String installStatus = null;
+                    String errorMessage = null;
+                    String appUrl = result.getString(context.getResources().getString(R.string.app_url));
+                    if (Constants.Code.SUCCESS.equals(code) && result.has(context.getResources().getString(R.string.app_install_status))) {
+                        installStatus = result.getString(context.getResources().getString(R.string.app_install_status));
                     }
-                    if (Constants.Code.FAILURE.equals(code) && result.has("appInstallFailedMessage")) {
-                        Preference.putString(context, context.getResources().getString(R.string.app_install_failed_message),
-                                             result.getString("appInstallFailedMessage"));
+                    if (Constants.Code.FAILURE.equals(code) && result.has(context.getResources().getString(R.string.app_install_failed_message))) {
+                        errorMessage = result.getString(context.getResources().getString(R.string.app_install_failed_message));
                     }
+                    AppOperationUtils.updateApplicationStatus(context, appUrl, null, installStatus, errorMessage);
                     break;
                 case Constants.Operation.UPGRADE_FIRMWARE:
                 case Constants.Operation.GET_FIRMWARE_UPGRADE_PACKAGE_STATUS:
@@ -71,7 +83,7 @@ public class SystemServiceResponseReceiver extends BroadcastReceiver {
                     break;
             }
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to parse response JSON" + e);
+            Log.e(TAG, "Failed to parse response JSON " + e);
         }
     }
 }

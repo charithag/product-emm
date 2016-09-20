@@ -24,16 +24,26 @@ import android.util.Log;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.wso2.emm.agent.AndroidAgentException;
 import org.wso2.emm.agent.R;
+import org.wso2.emm.agent.beans.AppOperation;
 import org.wso2.emm.agent.beans.Operation;
 import org.wso2.emm.agent.services.AgentDeviceAdminReceiver;
 import org.wso2.emm.agent.services.NotificationService;
 import org.wso2.emm.agent.services.PolicyOperationsMapper;
+import org.wso2.emm.agent.utils.AppOperationUtils;
 import org.wso2.emm.agent.utils.Constants;
 import org.wso2.emm.agent.utils.Preference;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -93,20 +103,14 @@ public class OperationProcessor {
 				operationManager.disableCamera(operation);
 				break;
 			case Constants.Operation.INSTALL_APPLICATION:
-				Preference.putInt(context, context.getResources().getString(
-						R.string.app_install_id), operation.getId());
-				Preference.putString(context, context.getResources().getString(
-						R.string.app_install_code), Constants.Operation.INSTALL_APPLICATION);
+				AppOperationUtils.addToPendingAppOperationsList(context, operationManager, operation);
 				operationManager.installAppBundle(operation);
 				break;
 			case Constants.Operation.INSTALL_APPLICATION_BUNDLE:
 				operationManager.installAppBundle(operation);
 				break;
 			case Constants.Operation.UPDATE_APPLICATION:
-				Preference.putInt(context, context.getResources().getString(
-						R.string.app_install_id), operation.getId());
-				Preference.putString(context, context.getResources().getString(
-						R.string.app_install_code), Constants.Operation.UPDATE_APPLICATION);
+				AppOperationUtils.addToPendingAppOperationsList(context, operationManager, operation);
 				operationManager.installAppBundle(operation);
 				break;
 			case Constants.Operation.UNINSTALL_APPLICATION:

@@ -29,10 +29,12 @@ import org.wso2.emm.agent.AndroidAgentException;
 import org.wso2.emm.agent.R;
 import org.wso2.emm.agent.api.ApplicationManager;
 import org.wso2.emm.agent.api.DeviceInfo;
+import org.wso2.emm.agent.beans.Operation;
 import org.wso2.emm.agent.beans.ServerConfig;
 import org.wso2.emm.agent.proxy.interfaces.APIResultCallBack;
 import org.wso2.emm.agent.proxy.utils.Constants.HTTP_METHODS;
 import org.wso2.emm.agent.services.operation.OperationProcessor;
+import org.wso2.emm.agent.utils.AppOperationUtils;
 import org.wso2.emm.agent.utils.Constants;
 import org.wso2.emm.agent.utils.Preference;
 import org.wso2.emm.agent.utils.CommonUtils;
@@ -153,7 +155,6 @@ public class MessageProcessor implements APIResultCallBack {
 		String requestParams;
 		ObjectMapper mapper = new ObjectMapper();
 		try {
-			requestParams =  mapper.writeValueAsString(replyPayload);
 			if (replyPayload != null) {
 				for (org.wso2.emm.agent.beans.Operation operation : replyPayload) {
 					if (operation.getCode().equals(Constants.Operation.WIPE_DATA) && !operation.getStatus().
@@ -198,31 +199,12 @@ public class MessageProcessor implements APIResultCallBack {
 						R.string.firmware_upgrade_failed_message), null);
 			}
 
-			int applicationOperationId = Preference.getInt(context, context.getResources().getString(
-					R.string.app_install_id));
-			String applicationOperationCode = Preference.getString(context, context.getResources().getString(
-					R.string.app_install_code));
-			String applicationOperationStatus = Preference.getString(context, context.getResources().getString(
-					R.string.app_install_status));
-			String applicationOperationMessage = Preference.getString(context, context.getResources().getString(
-					R.string.app_install_failed_message));
-			if (applicationOperationStatus != null && applicationOperationId != 0 && applicationOperationCode != null) {
-				org.wso2.emm.agent.beans.Operation applicationOperation = new org.wso2.emm.agent.beans.Operation();
-				ApplicationManager appMgt = new ApplicationManager(context);
-				applicationOperation.setId(applicationOperationId);
-				applicationOperation.setCode(applicationOperationCode);
-				applicationOperation = appMgt.getApplicationInstallationStatus(
-						applicationOperation, applicationOperationStatus, applicationOperationMessage);
-				if (replyPayload != null) {
-					replyPayload.add(applicationOperation);
-				} else {
-					replyPayload = new ArrayList<>();
-					replyPayload.add(applicationOperation);
-				}
-				Preference.putString(context, context.getResources().getString(
-						R.string.app_install_status), null);
-				Preference.putString(context, context.getResources().getString(
-						R.string.app_install_failed_message), null);
+			if (replyPayload == null) {
+				replyPayload = new ArrayList<>();
+			}
+			List<Operation> appOperations = AppOperationUtils.getAppOperationsToNotify(context);
+			for (Operation op : appOperations){
+				replyPayload.add(op);
 			}
 			requestParams =  mapper.writeValueAsString(replyPayload);
 		} catch (JsonMappingException e) {
