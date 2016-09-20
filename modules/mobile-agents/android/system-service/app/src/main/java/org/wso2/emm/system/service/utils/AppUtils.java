@@ -52,15 +52,15 @@ public class AppUtils {
      * @param context - Application context.
      * @param  packageUri - App package URI.
      */
-    public static void silentInstallApp(final Context context, Uri packageUri) {
+    public static void silentInstallApp(final Context context, Uri packageUri, final String appUrl) {
         PackageManager pm = context.getPackageManager();
         PackageInstallObserver observer = new PackageInstallObserver() {
             @Override
             public void onPackageInstalled(String basePackageName, int returnCode, String msg, Bundle extras) {
                 if (INSTALL_SUCCEEDED == returnCode) {
-                    publishAppInstallStatus(context, INSTALL_SUCCESS_STATUS, null);
+                    publishAppInstallStatus(context, appUrl, INSTALL_SUCCESS_STATUS, null);
                 } else {
-                    publishAppInstallStatus(context, INSTALL_FAILED_STATUS, "Package installation failed due to an " +
+                    publishAppInstallStatus(context, appUrl, INSTALL_FAILED_STATUS, "Package installation failed due to an " +
                                                                             "internal error with code " + returnCode + " " +
                                                                             "and message " + msg);
                 }
@@ -91,8 +91,7 @@ public class AppUtils {
         pm.deletePackage(packageName, observer, DELETE_ALL_USERS);
     }
 
-    private static void publishAppInstallStatus(Context context, String status, String error) {
-        String buildDate;
+    private static void publishAppInstallStatus(Context context, String appUrl, String status, String error) {
         JSONObject result = new JSONObject();
 
         try {
@@ -103,7 +102,7 @@ public class AppUtils {
             CommonUtils.sendBroadcast(context, Constants.Operation.SILENT_INSTALL_APPLICATION, Constants.Code.SUCCESS, Constants.Status.SUCCESSFUL,
                           result.toString());
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to create JSON object when publishing OTA progress.");
+            Log.e(TAG, "Failed to create JSON object when publishing App install status.");
             CommonUtils.sendBroadcast(context, Constants.Operation.SILENT_INSTALL_APPLICATION, Constants.Code.FAILURE, Constants.Status.INTERNAL_ERROR,
                           String.valueOf(DEFAULT_STATE_INFO_CODE));
         }
